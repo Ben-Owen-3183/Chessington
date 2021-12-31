@@ -40,7 +40,7 @@ public class BoardSquare
     private static void CreateSprites()
     {
         Texture2D texture = new Texture2D(8, 8, TextureFormat.ARGB32, false);
-        texture.Resize(320, 320);
+        texture.Reinitialize(320, 320);
         texture.filterMode = FilterMode.Point;
         texture.wrapMode = TextureWrapMode.Clamp;
         texture.Apply();
@@ -68,6 +68,7 @@ public class BoardSquare
     {
         chessPiece.gridPosition = gridPosition;
         this.ChessPiece = chessPiece;
+        chessPiece.inPlay = true;
     }
 
     public void SetChessPiece(ChessPiece chessPiece) {

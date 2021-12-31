@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,9 +7,11 @@ public class Main : MonoBehaviour
 {
     private GameObject chessBoardVisual;
     private Vector2 boardSize;
-    private BoardSquare[,] boardSquares;
     private BoardSquare selectedBoardSquare;
     private ChessPiece heldChessPiece;
+    private bool selectingPiece = false;
+
+    private BoardSquare lastMoveFrom, lastMoveTo;
 
     private ChessPiece.PieceColor currentPlayerColor;
 
@@ -18,7 +21,7 @@ public class Main : MonoBehaviour
     public bool IgnoreCheckOnPeiceMove;
     public Sprite blackCastle, blackHorse, blackBishop, blackKing, blackQueen, blackPawn, whiteCastle, whiteHorse, whiteBishop, whiteKing, whiteQueen, whitePawn;
 
-    private List<ChessPiece> whitePieces, blackPieces;
+    public PieceSelector pieceSelector;
 
     private void Awake()
     {
@@ -26,13 +29,22 @@ public class Main : MonoBehaviour
 
         CreateChessBoardSprite();
 
+        Bounds newCameraBounds = chessBoardVisual.GetComponent<Renderer>().bounds;
+        Camera.main.transform.position = new Vector3(
+            newCameraBounds.center.x,
+            newCameraBounds.center.y,
+            -20f
+        );
+        Camera.main.orthographicSize = newCameraBounds.size.y / 2f;
+
         takenWhitesRow = new GameObject();
         CreateTakenPieceRow(takenWhitesRow, 1);
         takenBlacksRow = new GameObject();
         CreateTakenPieceRow(takenBlacksRow, -1);
 
 
-        boardSquares = new BoardSquare[8, 8];
+
+        ChessBoard.boardSquares = new BoardSquare[8, 8];
 
         for (int x = 0; x < 8; ++x)
         {
@@ -40,17 +52,28 @@ public class Main : MonoBehaviour
             {
                 GameObject gameObject = new GameObject();
                 gameObject.transform.parent = chessBoardVisual.gameObject.transform;
-              
+
                 RectTransform rectTransform = gameObject.AddComponent<RectTransform>();
                 rectTransform.sizeDelta = new Vector2(boardSize.x / 8, boardSize.y / 8);
                 gameObject.transform.position = new Vector2((boardSize.x / 8 * (x + 1)) - boardSize.x / 16, (boardSize.y / 8 * y) + boardSize.y / 16);
-                boardSquares[x, y] = new BoardSquare(gameObject, new Vector2Int(x, y));
+                ChessBoard.boardSquares[x, y] = new BoardSquare(gameObject, new Vector2Int(x, y));
             }
         }
-        blackPieces = new List<ChessPiece>(16);
-        CreatePeices(blackCastle, blackHorse, blackBishop, blackKing, blackQueen, blackPawn, ChessPiece.PieceColor.Black, blackPieces);
-        whitePieces = new List<ChessPiece>(16);
-        CreatePeices(whiteCastle, whiteHorse, whiteBishop, whiteKing, whiteQueen, whitePawn, ChessPiece.PieceColor.White, whitePieces);
+
+        // create last move highlight sqaures
+        GameObject gameObjectLastMove = new GameObject();
+        gameObjectLastMove.AddComponent<RectTransform>();
+        gameObjectLastMove.transform.parent = chessBoardVisual.transform;
+        lastMoveFrom = new BoardSquare(gameObjectLastMove, new Vector2Int(-1, -1));
+        gameObjectLastMove = new GameObject();
+        gameObjectLastMove.AddComponent<RectTransform>();
+        gameObjectLastMove.transform.parent = chessBoardVisual.transform;
+        lastMoveTo = new BoardSquare(gameObjectLastMove, new Vector2Int(-1, -1));
+
+        ChessBoard.blackPieces = new List<ChessPiece>(16);
+        CreatePeices(blackCastle, blackHorse, blackBishop, blackKing, blackQueen, blackPawn, ChessPiece.PieceColor.Black, ChessBoard.blackPieces);
+        ChessBoard.whitePieces = new List<ChessPiece>(16);
+        CreatePeices(whiteCastle, whiteHorse, whiteBishop, whiteKing, whiteQueen, whitePawn, ChessPiece.PieceColor.White, ChessBoard.whitePieces);
     }
 
     // Creates the game object row for the taken pieces to go in
@@ -72,7 +95,8 @@ public class Main : MonoBehaviour
 
     private void CreatePeices(Sprite castle, Sprite horse, Sprite bishop, Sprite king, Sprite queen, Sprite pawn, ChessPiece.PieceColor pieceColor, List<ChessPiece> piecesInPlay)
     {
-        ChessPiece.boardSquares = boardSquares;
+        ChessPiece.boardSquares = ChessBoard.boardSquares;
+        BoardSquare[,] boardSquares = ChessBoard.boardSquares;
 
         int y = pieceColor == ChessPiece.PieceColor.White ? 1 : 8;
 
@@ -154,7 +178,7 @@ public class Main : MonoBehaviour
         for (int i = 1; i < pixels.Length; ++i)
         {
             Color color = pixels[i - 1] == colorB ? colorA : colorB;
-
+          
             if (i % 8 == 0)
                 pixels[i] = color == colorB ? colorA : colorB;
             else
@@ -170,6 +194,7 @@ public class Main : MonoBehaviour
 
         chessBoardVisual.transform.localScale = new Vector3(320, 320);
 
+        RectTransform rectTransform = chessBoardVisual.AddComponent<RectTransform>();
         boardSize = renderer.bounds.size;
     }
 
@@ -181,47 +206,75 @@ public class Main : MonoBehaviour
 
     private void UnselectAllSquares()
     {
-        foreach(BoardSquare boardSquare in boardSquares)
-        {
+        foreach(BoardSquare boardSquare in ChessBoard.boardSquares)
             boardSquare.Unselect();
-        }
     }
-
-    private bool IsLegalMove(BoardSquare from, BoardSquare to)
-    {
-        ChessPiece playerPiece = from.ChessPiece;
-
-        if(to.ChessPiece != null)
-        {
-            if (playerPiece.color == to.ChessPiece.color)
-                return false;
-
-            ChessPiece takenPiece = to.TakeChessPiece();
-            to.SetInitialChessPiece(from.TakeChessPiece());
-            bool kingInCheck = KingInCheck(playerPiece.color);
-
-            from.SetInitialChessPiece(to.TakeChessPiece());
-            to.SetInitialChessPiece(takenPiece);
-
-            if (!kingInCheck)
-                return true;
-            return false;
-        }
-        else
-        {
-            to.SetInitialChessPiece(from.TakeChessPiece());
-            bool kingInCheck = KingInCheck(playerPiece.color);
-            from.SetInitialChessPiece(to.TakeChessPiece());
-            if (!kingInCheck)
-                return true;
-        }
-
-        return false;
-    }
-
+    
     // Update is called once per frame
     void Update()
     {
+        if (selectingPiece)
+        {
+            if (pieceSelector.selectedPieceType != null)
+            {
+                Type type = pieceSelector.selectedPieceType;
+                ChessPiece newChessPiece;
+                Pawn pawnToSwap = pieceSelector.pawnToSwap;
+                Sprite sprite;
+                if(type == typeof(Queen))
+                {
+                    sprite = pawnToSwap.color == ChessPiece.PieceColor.Black ? blackQueen : whiteQueen;
+                    GameObject gameObject = CreateChessPeice(sprite, pawnToSwap.GameObject.transform.position);
+                    newChessPiece = new Queen(pawnToSwap.color, gameObject, pawnToSwap.gridPosition);
+                }
+                else if (type == typeof(Castle))
+                {
+                    sprite = pawnToSwap.color == ChessPiece.PieceColor.Black ? blackCastle : whiteCastle;
+                    GameObject gameObject = CreateChessPeice(sprite, pawnToSwap.GameObject.transform.position);
+                    newChessPiece = new Castle(pawnToSwap.color, gameObject, pawnToSwap.gridPosition);
+                }
+                else if (type == typeof(Horse))
+                {
+                    sprite = pawnToSwap.color == ChessPiece.PieceColor.Black ? blackHorse : whiteHorse;
+                    GameObject gameObject = CreateChessPeice(sprite, pawnToSwap.GameObject.transform.position);
+                    newChessPiece = new Horse(pawnToSwap.color, gameObject, pawnToSwap.gridPosition);
+                }
+                else
+                {
+                    sprite = pawnToSwap.color == ChessPiece.PieceColor.Black ? blackBishop : whiteBishop;
+                    GameObject gameObject = CreateChessPeice(sprite, pawnToSwap.GameObject.transform.position);
+                    newChessPiece = new Bishop(pawnToSwap.color, gameObject, pawnToSwap.gridPosition);
+                }
+
+                int x = pawnToSwap.gridPosition.x;
+                int y = pawnToSwap.gridPosition.y;
+
+                ChessBoard.boardSquares[x, y].TakeChessPiece();
+
+                ChessBoard.boardSquares[x, y].SetChessPiece(newChessPiece);
+
+                if (pawnToSwap.color == ChessPiece.PieceColor.Black)
+                {
+                    ChessBoard.blackPieces.Remove(pawnToSwap);
+                    ChessBoard.blackPieces.Add(newChessPiece);
+                }
+                else
+                {
+                    ChessBoard.whitePieces.Remove(pawnToSwap);
+                    ChessBoard.whitePieces.Add(newChessPiece);
+                }
+
+                Destroy(pawnToSwap.GameObject);
+
+                ToggleCurrentPlayerColor();
+                selectingPiece = false;
+                pieceSelector.Reset();
+            }
+
+
+            return; // dont allow game to continue unless piece choosen
+        }
+
         Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
         if (heldChessPiece != null)
@@ -239,18 +292,20 @@ public class Main : MonoBehaviour
                 heldChessPiece.SetPickedUp();
 
                 if (selectedBoardSquare != null) UnselectAllSquares();
+
                 boardSquare.Select(BoardSquare.IconState.SELECTED);
-                List<BoardSquare> possibleMoves = boardSquare.ChessPiece.PossibleMoves();
-                foreach(BoardSquare possibleMove in possibleMoves)
+
+                foreach(ChessMove move in heldChessPiece.AllMoves())
                 {
-                    if(IsLegalMove(boardSquare, possibleMove))
+                    if(move.validity == ChessMove.Validity.LEGAL)
                     {
-                        if (possibleMove.ChessPiece == null)
-                            possibleMove.Select(BoardSquare.IconState.MOVE);
-                        else
-                            possibleMove.Select(BoardSquare.IconState.ATTACK);
-                    }                    
+                        if (move.type == ChessMove.Type.STANDARD_MOVE || move.type == ChessMove.Type.CASTLING)
+                            move.to.Select(BoardSquare.IconState.MOVE);
+                        else if (move.type == ChessMove.Type.TAKES_PIECE)
+                            move.to.Select(BoardSquare.IconState.ATTACK);
+                    }
                 }
+
                 selectedBoardSquare = boardSquare;
             }
             else
@@ -285,9 +340,7 @@ public class Main : MonoBehaviour
             offset = whitesTaken++;
             row = takenWhitesRow;
         }
-
-        Debug.Log(row);
-
+        
         float x = row.transform.position.x
             - row.GetComponent<RectTransform>().rect.width / 2
             + (offset * (boardSize.x / 16));
@@ -296,8 +349,6 @@ public class Main : MonoBehaviour
             x,
             row.transform.position.y
         );
-
-        
     }
 
     /**
@@ -305,92 +356,151 @@ public class Main : MonoBehaviour
      */
     private ChessPiece GetPiece<T>(ChessPiece.PieceColor pieceColor)
     {
-        List<ChessPiece> pieces = (pieceColor == ChessPiece.PieceColor.White ? whitePieces : blackPieces);
+        List<ChessPiece> pieces = (pieceColor == ChessPiece.PieceColor.White ? ChessBoard.whitePieces : ChessBoard.blackPieces);
 
         foreach (ChessPiece chessPiece in pieces)
             if (typeof(T) == chessPiece.GetType())
                 return chessPiece;
         return null;
     }
-
-    private bool KingInCheck(ChessPiece.PieceColor pieceColor)
-    {
-        List<ChessPiece> pieces = (pieceColor == ChessPiece.PieceColor.White ? blackPieces : whitePieces);
-        King king = (King)GetPiece<King>(pieceColor);
-        BoardSquare kingsBoardSquare = king.BoardSquare;
-
-        foreach(ChessPiece chessPiece in pieces)
-            if (chessPiece.inPlay && chessPiece.CanAtackSquare(kingsBoardSquare))
-                return true;
-        return false;
-    }
-
+    
     private void ToggleCurrentPlayerColor()
     {
+        Vector3 position = chessBoardVisual.GetComponent<Renderer>().bounds.center;
+        chessBoardVisual.transform.RotateAround(position, Vector3.forward, 180f);
+
+        List<ChessPiece> chessPieces = new List<ChessPiece>();
+        chessPieces.AddRange(ChessBoard.blackPieces);
+        chessPieces.AddRange(ChessBoard.whitePieces);
+
+        foreach (ChessPiece chessPiece in chessPieces)
+            chessPiece.GameObject.transform.Rotate(0, 0, 180f);
+
         currentPlayerColor = currentPlayerColor == ChessPiece.PieceColor.Black ? ChessPiece.PieceColor.White : ChessPiece.PieceColor.Black;
     }
 
     private void TryToPlaceHeldPiece(Vector2 mousePosition)
     {
         BoardSquare selectedBoardSquare = GetIntersectionBoardSquare(mousePosition);
-        if (selectedBoardSquare == null)
+
+        if(heldChessPiece.BoardSquare == selectedBoardSquare)
         {
+            ResetHeldPiece();
             return;
         }
 
-        if (selectedBoardSquare != heldChessPiece.BoardSquare)
+        // DEBUG MODE 
+        if (IgnoreCheckOnPeiceMove)
         {
-            Debug.Log("y doe??");
-            // if board sqaure is free
-            if (selectedBoardSquare.ChessPiece == null)
-                TryPlacePieceOnEmptySquare(selectedBoardSquare);
-            // if board sqaure has a piece on it
-            else if (selectedBoardSquare.ChessPiece.color != heldChessPiece.color)
-                TryPlacePieceOnOccupiedSquare(selectedBoardSquare);
-        }
-        else
-        {
-            Debug.Log("No move ????");
-        }
-        
+            BoardSquare heldPieceBoardSqaure = heldChessPiece.BoardSquare;
+            if (selectedBoardSquare.ChessPiece != null)
+            {
+                ChessPiece takenPiece = selectedBoardSquare.TakeChessPiece();
+                selectedBoardSquare.SetChessPiece(heldPieceBoardSqaure.TakeChessPiece());
+                AddPieceToTakenRow(takenPiece);
+                ToggleCurrentPlayerColor();
+                UnselectAllSquares();
+            }
+            else
+            {
+                heldPieceBoardSqaure.TakeChessPiece();
+                selectedBoardSquare.SetChessPiece(heldChessPiece);
+                ToggleCurrentPlayerColor();
+                UnselectAllSquares();
+            }
 
+            ResetHeldPiece();
+            return;
+        }
+
+
+        ChessMove move = FindChessMoveBySqaure(selectedBoardSquare);
+        if(move != null)
+        {
+            if(move.IsValid())
+            {
+                ChessPiece takenPiece = move.Execute();
+
+                if (takenPiece != null)
+                    AddPieceToTakenRow(takenPiece);
+
+                if (move.to.ChessPiece.GetType() == typeof(Pawn)
+                    && CheckIfPawnReachedOtherSide((Pawn)move.to.ChessPiece))
+                {
+                    selectingPiece = true;
+                }
+                else
+                {
+                    if (ColorInCheckMate(currentPlayerColor))
+                    {
+                        Debug.Log("Checkmate!!!!!!");
+                    }
+
+                    ToggleCurrentPlayerColor();
+                }
+
+                lastMoveFrom.squareGameObject.transform.position = move.from.squareGameObject.transform.position;
+                lastMoveTo.squareGameObject.transform.position = move.to.squareGameObject.transform.position;
+                lastMoveFrom.Select(BoardSquare.IconState.SELECTED);
+                lastMoveTo.Select(BoardSquare.IconState.SELECTED);
+            }
+            else if(move.validity == ChessMove.Validity.CAUSES_CHECK)
+            {
+                King king = (King)GetPiece<King>(heldChessPiece.color);
+
+                ResetHeldPiece();// actually updates the visuals...probs should change name
+                UnselectAllSquares();
+                king.BoardSquare.Select(BoardSquare.IconState.ATTACK);
+                return;
+            }
+
+            UnselectAllSquares();
+        }
 
         ResetHeldPiece();// actually updates the visuals...probs should change name
     }
 
-    private void TryPlacePieceOnOccupiedSquare(BoardSquare selectedBoardSquare)
+    private bool CheckIfPawnReachedOtherSide(Pawn pawn)
     {
-        BoardSquare heldPieceBoardSqaure = heldChessPiece.BoardSquare;
-
-        if (IgnoreCheckOnPeiceMove)
+        if (pawn.ReachedOtherSide())
         {
-            ChessPiece takenPiece = selectedBoardSquare.TakeChessPiece();
-            selectedBoardSquare.SetChessPiece(heldPieceBoardSqaure.TakeChessPiece());
+            if (pawn.color == ChessPiece.PieceColor.White)
+                pieceSelector.SetImages(whiteQueen, whiteCastle, whiteHorse, whiteBishop);
+            else
+                pieceSelector.SetImages(blackQueen, blackCastle, blackHorse, blackBishop);
 
-            AddPieceToTakenRow(takenPiece);
-            ToggleCurrentPlayerColor();
-
-            UnselectAllSquares();
+            pieceSelector.pawnToSwap = pawn;
+            pieceSelector.gameObject.SetActive(true);
+            return true;
         }
-        else
-        {
-
-        }
+        return false;
     }
 
-    private void TryPlacePieceOnEmptySquare(BoardSquare selectedBoardSquare)
+    private bool ColorInCheckMate(ChessPiece.PieceColor pieceColor)
     {
-        BoardSquare heldPieceBoardSqaure = heldChessPiece.BoardSquare;
-
-        if (IgnoreCheckOnPeiceMove)
+        List<ChessPiece> chessPieces = (pieceColor == ChessPiece.PieceColor.White ? ChessBoard.blackPieces : ChessBoard.whitePieces);
+        foreach (ChessPiece chessPiece in chessPieces)
         {
-            heldPieceBoardSqaure.TakeChessPiece();
-            selectedBoardSquare.SetChessPiece(heldChessPiece);
-            ToggleCurrentPlayerColor();
-            UnselectAllSquares();
-            return;
+            if (chessPiece.inPlay)
+            {
+                List<ChessMove> chessMoves = chessPiece.AllMoves();
+                if (chessMoves.Count > 0)
+                {
+                    foreach (ChessMove chessMove in chessMoves)
+                        if (chessMove.IsValid())
+                            return false;
+                }
+            }
         }
+        return true;
+    }
 
+    private ChessMove FindChessMoveBySqaure(BoardSquare boardSquare)
+    {
+        foreach (ChessMove move in heldChessPiece.AllMoves())
+            if (move.to == boardSquare)
+                return move;
+        return null;
     }
 
     private void ResetHeldPiece()
@@ -401,7 +511,7 @@ public class Main : MonoBehaviour
 
     private BoardSquare GetIntersectionBoardSquare(Vector2 position)
     {
-        foreach (BoardSquare boardSquare in boardSquares)
+        foreach (BoardSquare boardSquare in ChessBoard.boardSquares)
             if (boardSquare.Intersects(position))
                 return boardSquare;
         return null;

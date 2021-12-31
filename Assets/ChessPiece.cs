@@ -7,6 +7,7 @@ public abstract class ChessPiece
     public bool inPlay = true;
 
     public enum PieceColor { Black, White }
+
     public PieceColor color;
     public static BoardSquare[,] boardSquares;
     public BoardSquare BoardSquare { get { return boardSquares[gridPosition.x, gridPosition.y];  } }
@@ -15,9 +16,7 @@ public abstract class ChessPiece
     public Vector2Int gridPosition;
 
     public bool hasMoved = false;
-
     
-
     protected GameObject gameObject;
 
     /**
@@ -25,7 +24,15 @@ public abstract class ChessPiece
      * a given king to be currently in check or moves causing a king to
      * be put in check
      */
-    public abstract List<BoardSquare> PossibleMoves();
+    protected abstract List<BoardSquare> PossibleMoves();
+
+    public virtual List<ChessMove> AllMoves()
+    {
+        List<ChessMove> pieceMoves = new List<ChessMove>();
+        foreach (BoardSquare possibleMove in PossibleMoves())
+            pieceMoves.Add(new ChessMove(BoardSquare, possibleMove));
+        return pieceMoves;
+    }
 
     public abstract void Move(Vector2Int gridPos);
 
@@ -48,15 +55,6 @@ public abstract class ChessPiece
                 return true;
         return false;
     }
-
-    /**
-     * Ignores piece on board square when looking for attack on sqaure
-     */
-    public bool CanAtackSquare(BoardSquare boardSquare, List<BoardSquare> boardSquaresToIgnore)
-    {
-        return false;
-    }
-
 
     protected void ScanDirectionForMoves(Vector2Int direction, List<BoardSquare> legaMoves, int range)
     {

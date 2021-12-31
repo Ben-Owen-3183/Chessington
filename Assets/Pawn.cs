@@ -11,7 +11,15 @@ public class Pawn : ChessPiece
         this.gameObject = gameObject;
     }
 
-    public override List<BoardSquare> PossibleMoves()
+    public bool ReachedOtherSide()
+    {
+        int target = color == PieceColor.Black ? 0 : 7;
+        if (gridPosition.y == target)
+            return true;
+        return false;
+    }
+
+    protected override List<BoardSquare> PossibleMoves()
     {
         List<BoardSquare> legaMoves = new List<BoardSquare>();
 

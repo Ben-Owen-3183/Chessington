@@ -30,7 +30,7 @@ public class Horse : ChessPiece
         
     }
 
-    public override List<BoardSquare> PossibleMoves()
+    protected override List<BoardSquare> PossibleMoves()
     {
         List<BoardSquare> legaMoves = new List<BoardSquare>();
 

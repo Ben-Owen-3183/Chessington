@@ -60,6 +60,7 @@ TextureImporter:
   streamingMipmaps: 0
   streamingMipmapsPriority: 0
   vTOnly: 0
+  ignoreMasterTextureLimit: 0
   grayScaleToAlpha: 0
   generateCubemap: 6
   cubemapConvolution: 0
@@ -68,9 +69,9 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: -1
-    aniso: -1
-    mipBias: -100
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
     wrapU: 1
     wrapV: 1
     wrapW: 1
@@ -424,6 +425,19 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
+    nameFileIdTable:
+      vippng.com-pieces-png-382720_11: -2820654742620897479
+      vippng.com-pieces-png-382720_8: 2233782264758986371
+      vippng.com-pieces-png-382720_10: 863104924124715060
+      vippng.com-pieces-png-382720_2: -2215715108769312240
+      vippng.com-pieces-png-382720_6: -1348900349522693787
+      vippng.com-pieces-png-382720_4: 7618382323753770196
+      vippng.com-pieces-png-382720_7: 976816332811773231
+      vippng.com-pieces-png-382720_0: -6208969459913890223
+      vippng.com-pieces-png-382720_1: 8687342874830709308
+      vippng.com-pieces-png-382720_9: -2115610426859117868
+      vippng.com-pieces-png-382720_5: -7734082964745202535
+      vippng.com-pieces-png-382720_3: -2096674746771237303
   spritePackingTag: 
   pSDRemoveMatte: 0
   pSDShowRemoveMatteOption: 0
